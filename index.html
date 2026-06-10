@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自然探險家 - 戳戳樂複習遊戲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            background-color: #f0fdf4; /* Light green background */
+        }
+        .punch-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 0.5rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        @media (max-width: 640px) {
+            .punch-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        .punch-cell {
+            aspect-ratio: 1 / 1;
+            background-color: #fca5a5; /* Reddish cover */
+            border: 2px dashed #b91c1c;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #7f1d1d;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .punch-cell:hover {
+            transform: scale(1.05);
+            background-color: #f87171;
+        }
+        .punch-cell.punched {
+            background-color: #e5e7eb; /* Gray inner */
+            border: 2px solid #9ca3af;
+            color: #4b5563;
+            cursor: default;
+            transform: none;
+            box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1);
+        }
+        .punch-cell.punched::before {
+             content: "✓";
+             position: absolute;
+             font-size: 2rem;
+             color: #10b981; /* Green check */
+        }
+        .punch-cell.punched.wrong::before {
+             content: "✗";
+             color: #ef4444; /* Red cross */
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 50;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 2rem;
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: relative;
+            animation: slideIn 0.3s ease-out forwards;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* Options Styling */
+        .option-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background-color: #f3f4f6;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1.1rem;
+        }
+        .option-btn:hover {
+            background-color: #e0e7ff;
+            border-color: #818cf8;
+        }
+        .option-btn.selected {
+            background-color: #c7d2fe;
+            border-color: #4f46e5;
+        }
+        
+        .hint-box {
+            display: none;
+            background-color: #fef08a;
+            border-left: 4px solid #eab308;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            color: #854d0e;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-10">
+
+    <header class="bg-green-600 text-white p-6 shadow-md text-center">
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-2">🌿 自然探險家：戳戳樂大挑戰 🔬</h1>
+        <p class="text-green-100 text-lg">五年級自然 - 生鏽與食物保存 ＆ 生態與生物體</p>
+        <div class="mt-4 flex justify-center gap-4 text-sm font-semibold">
+            <span class="bg-green-700 px-3 py-1 rounded-full">已戳開：<span id="progress-count">0</span> / 40</span>
+            <span class="bg-green-700 px-3 py-1 rounded-full">得分：<span id="score-display">0</span></span>
+        </div>
+    </header>
+
+    <main class="container mx-auto mt-8 px-4">
+        <div class="text-center mb-6">
+            <p class="text-gray-700 text-lg">點擊下面的格子，回答問題來收集探險積分吧！</p>
+        </div>
+        <div id="game-grid" class="punch-grid">
+            <!-- JavaScript will populate 40 cells here -->
+        </div>
+    </main>
+
+    <div id="question-modal" class="modal">
+        <div class="modal-content border-t-8 border-green-500">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-xl font-bold text-gray-800">第 <span id="q-number">1</span> 題</h2>
+                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-blue-400" id="q-category">分類</span>
+            </div>
+            
+            <p id="q-text" class="text-lg text-gray-700 mb-6 font-medium tracking-wide"></p>
+            
+            <div id="q-options" class="mb-6">
+                <!-- Options injected by JS -->
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <button id="btn-hint" class="flex items-center gap-2 text-yellow-600 hover:text-yellow-700 font-semibold transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    需要提示嗎？
+                </button>
+                <button id="btn-submit" class="bg-green-500 hover:bg-green-600 text-white px-8 py-2 rounded-full font-bold shadow-lg transform transition-transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                    確認送出
+                </button>
+            </div>
+
+            <div id="hint-container" class="hint-box mt-4">
+                <strong class="block mb-1">💡 探險提示：</strong>
+                <span id="hint-text"></span>
+            </div>
+
+            <!-- Feedback overlay inside modal -->
+            <div id="feedback-overlay" class="hidden absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center rounded-xl z-10">
+                <div id="feedback-icon" class="text-6xl mb-4"></div>
+                <h3 id="feedback-title" class="text-2xl font-bold mb-2"></h3>
+                <p id="feedback-desc" class="text-gray-600 text-center px-6 mb-6"></p>
+                <button id="btn-close-modal" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full font-bold shadow">
+                    繼續探險
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="modal">
+        <div class="modal-content border-t-8 border-yellow-500 text-center">
+            <h1 class="text-4xl font-extrabold text-yellow-600 mb-2">🎉 恭喜過關！ 🎉</h1>
+            <h2 class="text-2xl font-bold text-gray-800 mb-6">恭喜成為自然探險家</h2>
+            
+            <div class="bg-gray-100 rounded-lg p-6 mb-6 shadow-inner">
+                <div class="grid grid-cols-2 gap-4 text-lg">
+                    <div class="text-right font-semibold text-gray-600">完成題數：</div>
+                    <div class="text-left font-bold text-blue-600">40 / 40</div>
+                    
+                    <div class="text-right font-semibold text-gray-600">答對題數：</div>
+                    <div class="text-left font-bold text-green-600" id="report-correct">0</div>
+                    
+                    <div class="text-right font-semibold text-gray-600">使用提示次數：</div>
+                    <div class="text-left font-bold text-yellow-600" id="report-hints">0</div>
+                    
+                    <div class="text-right font-semibold text-gray-600">總得分：</div>
+                    <div class="text-left font-bold text-red-600 text-2xl" id="report-score">0</div>
+                </div>
+            </div>
+
+            <!-- 迷思概念診斷區塊 -->
+            <div id="weakness-section" class="mb-6 text-left hidden">
+                <h3 class="text-xl font-bold text-red-500 mb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    發現迷思概念
+                </h3>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-sm text-red-700 font-semibold mb-2">根據作答結果，你對以下主題還有些不熟悉，建議多複習喔：</p>
+                    <ul id="weakness-list" class="list-disc list-inside text-gray-800 space-y-1 font-medium"></ul>
+                </div>
+            </div>
+
+            <!-- 重點整理複習區塊 -->
+            <div id="review-section" class="mb-8 text-left">
+                <h3 class="text-xl font-bold text-green-600 mb-2 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                    專屬重點整理小秘笈
+                </h3>
+                <div id="review-content" class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-800 space-y-3 shadow-inner">
+                    <!-- 動態載入重點內容 -->
+                </div>
+            </div>
+            
+            <p class="text-gray-600 mb-8 font-bold" id="report-message"></p>
+            
+            <button onclick="location.reload()" class="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white px-8 py-3 rounded-full font-bold shadow-lg transform transition-transform hover:scale-105">
+                再玩一次，挑戰滿分！
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 100 Questions strictly aligned with Hanlin Textbook (Unit 3 & Unit 4)
+        const questionsData = [
+            // --- 3-1 生鏽 (13題) ---
+            { id: 1, type: "choice", category: "生鏽", text: "鐵生鏽後產生的物質稱為「鐵鏽」，它通常是什麼顏色的？", options: ["銀灰色", "透明無色", "褐色或紅棕色", "純黑色"], answer: 2, hint: "生鏽後顏色會改變，想想看生鏽鐵釘的顏色。" },
+            { id: 2, type: "tf", category: "生鏽", text: "生鏽的物品大多為鐵製品，摸起來感覺粗糙，有時還有碎屑掉下來。", options: ["對", "錯"], answer: 0, hint: "鐵鏽的結構比較鬆散，不像原本的鐵那麼平滑堅硬。" },
+            { id: 3, type: "choice", category: "生鏽", text: "在科學實驗中，依據假設而「改變」的變因稱為什麼？", options: ["控制變因", "操作變因", "結果變因", "固定變因"], answer: 1, hint: "我們『操作』它來看看會發生什麼事。" },
+            { id: 4, type: "tf", category: "生鏽", text: "在鐵製品生鏽的實驗中，除了水分之外，其他的條件（如夾鏈袋大小、放置環境）都要保持不變，這些稱為「控制變因」。", options: ["對", "錯"], answer: 0, hint: "為了確保實驗結果公平，只能有一個條件不一樣。" },
+            { id: 5, type: "choice", category: "生鏽", text: "設計實驗時必須分為兩組，其中進行操作變因的組別稱為？", options: ["對照組", "實驗組", "觀察組", "變化組"], answer: 1, hint: "這是用來測試我們假設的組別。" },
+            { id: 6, type: "choice", category: "生鏽", text: "鐵生鏽的主要原因是接觸了較多的什麼？", options: ["空氣和水分", "陽光和土壤", "二氧化碳和糖", "細菌和灰塵"], answer: 0, hint: "這兩個條件同時存在時，鐵就容易生鏽。" },
+            { id: 7, type: "choice", category: "生鏽", text: "戶外的「鐵門和欄杆」通常使用哪一種防鏽方法？", options: ["塗潤滑油", "保持乾燥", "塗油漆", "以塑膠皮包覆"], answer: 2, hint: "面積大且在戶外，通常會塗上有顏色的保護層。" },
+            { id: 8, type: "tf", category: "生鏽", text: "腳踏車的鏈條和剪刀的轉軸，通常會利用「抹油」來防鏽，這能隔絕水分和空氣。", options: ["對", "錯"], answer: 0, hint: "抹油除了防鏽，還兼具潤滑的功能喔！" },
+            { id: 9, type: "choice", category: "生鏽", text: "迴紋針和衣架表面亮亮滑滑的，是使用了什麼防鏽方法？", options: ["以塑膠皮包覆", "保持乾燥", "電鍍或合金", "塗油漆"], answer: 0, hint: "外面包了一層彩色的軟材質來減少接觸空氣。" },
+            { id: 10, type: "choice", category: "生鏽", text: "鋼杯和不鏽鋼餐具不會生鏽，是因為使用了哪一種防鏽原理？", options: ["保持乾燥", "以塑膠皮包覆", "抹油", "電鍍或合金材質"], answer: 3, hint: "它們在製造時加入了其他不易生鏽的金屬成分。" },
+            { id: 11, type: "tf", category: "生鏽", text: "菜刀洗好之後立刻擦乾，是利用「保持乾燥」來阻斷生鏽的水分條件。", options: ["對", "錯"], answer: 0, hint: "沒有水，生鏽的速度就會變得很慢很慢。" },
+            { id: 12, type: "choice", category: "生鏽", text: "下列哪一個「不是」減緩鐵製品生鏽的方法？", options: ["表面塗油漆", "泡在鹽水中", "表面電鍍", "保持乾燥"], answer: 1, hint: "鹽水反而會加速金屬腐蝕喔！" },
+            { id: 13, type: "tf", category: "生鏽", text: "防鏽的最主要原理，就是減少或避免鐵製品接觸到空氣和水分。", options: ["對", "錯"], answer: 0, hint: "把它跟生鏽的兩大元兇隔離開來就對了！" },
+
+            // --- 3-2 食物保存 (13題) ---
+            { id: 14, type: "choice", category: "食物保存", text: "新鮮食物放在空氣中久了會長黴、腐爛，主要是因為什麼孳生？", options: ["小昆蟲", "黴菌 (微生物)", "灰塵", "病毒"], answer: 1, hint: "這是一種肉眼不容易看清楚的微小生物。" },
+            { id: 15, type: "tf", category: "食物保存", text: "黴菌是一種「微生物」，要仔細觀察牠們，可以利用放大鏡或顯微鏡。", options: ["對", "錯"], answer: 0, hint: "因為牠們太小了，需要靠光學儀器幫忙放大。" },
+            { id: 16, type: "choice", category: "食物保存", text: "哪一種環境因素「最容易」促使黴菌生長？", options: ["寒冷、明亮、乾燥", "溫暖、陰暗、潮溼", "高溫、曝曬、乾燥", "低溫、陰暗、乾燥"], answer: 1, hint: "想想看梅雨季時，衣櫥裡是不是很容易發霉？" },
+            { id: 17, type: "tf", category: "食物保存", text: "在測試水分對吐司長黴的實驗中，「滴水」或「不滴水」就是這個實驗的控制變因。", options: ["錯", "對"], answer: 0, hint: "我們主動去改變的條件（滴水/不滴水）叫做「操作變因」。" },
+            { id: 18, type: "choice", category: "食物保存", text: "下列哪一個是「傳統」保存食品的方法？", options: ["製成真空包裝", "低溫冷藏", "曝曬、醃漬、煙燻", "放入乾燥包"], answer: 2, hint: "古人沒有冰箱也沒有塑膠袋，通常靠大自然的力量或鹽巴處理。" },
+            { id: 19, type: "tf", category: "食物保存", text: "洋芋片包裝裡通常會「填充氮氣」，這是一種現代的食物保存方法。", options: ["對", "錯"], answer: 0, hint: "把空氣(氧氣)擠出去換成氮氣，可以避免食物氧化變質。" },
+            { id: 20, type: "choice", category: "食物保存", text: "把食物製成「罐頭」，最主要是利用哪一種保存食品的原理？", options: ["保持低溫", "隔絕空氣", "增加水分", "接觸陽光"], answer: 1, hint: "罐頭密封後，外面的空氣和細菌就進不去了。" },
+            { id: 21, type: "tf", category: "食物保存", text: "保存食品的原理，主要就是「隔絕空氣」、「減少水分」或「保持低溫」，來減少黴菌孳生。", options: ["對", "錯"], answer: 0, hint: "破壞微生物喜歡的環境就能保存食物。" },
+            { id: 22, type: "choice", category: "食物保存", text: "香菇經過「脫水乾燥」後可以保存很久，是因為破壞了黴菌生長的哪一個條件？", options: ["陰暗", "潮溼(水分)", "溫暖", "空氣"], answer: 1, hint: "「乾」香菇裡面缺少了什麼？" },
+            { id: 23, type: "tf", category: "食物保存", text: "低溫冷藏或冷凍可以完全殺死所有的黴菌，讓食物永遠不會壞掉。", options: ["錯", "對"], answer: 0, hint: "低溫只能「減緩」或抑制生長，並不能完全殺死牠們喔！" },
+            { id: 24, type: "choice", category: "食物保存", text: "海苔包裝裡面常常有一小包白白的東西，那是用來做什麼的？", options: ["調味料", "乾燥包(減少水分)", "防撞包", "保溫包"], answer: 1, hint: "海苔怕軟掉，所以要保持乾燥。" },
+            { id: 25, type: "tf", category: "食物保存", text: "利用醃漬法（加大量的鹽）可以改變食物的環境，降低微生物生長的機會。", options: ["對", "錯"], answer: 0, hint: "像鹹菜、醬瓜都是用這種傳統方法保存的。" },
+            { id: 26, type: "choice", category: "食物保存", text: "新鮮的食物放在空氣中久了，除了長黴、腐爛外，還可能會出現什麼變化？", options: ["變得更重", "失去水分變乾癟", "變成化石", "長出葉子"], answer: 1, hint: "蘋果放久了表面會皺皺的。" },
+
+            // --- 4-1 動物偵查員 (生態系與動物行為 24題) ---
+            { id: 27, type: "choice", category: "生態系", text: "一定空間範圍內「同時生活」的「同種」生物之集合稱為什麼？", options: ["群集", "族群", "生態系", "聚落"], answer: 1, hint: "例如：黑板樹上的『所有』麻雀。" },
+            { id: 28, type: "tf", category: "生態系", text: "不同種的生物族群，同時生活在同一個空間裡，則稱為「群集」。", options: ["對", "錯"], answer: 0, hint: "包含植物、動物、昆蟲等等不同物種的集合體。" },
+            { id: 29, type: "choice", category: "生態系", text: "生物之間藉由「吃與被吃」的關係，將能量連結在一起，稱為什麼？", options: ["食物網", "食物鏈", "共生圈", "營養線"], answer: 1, hint: "像一條鍊子一樣把生物串起來。" },
+            { id: 30, type: "tf", category: "生態系", text: "在食物鏈中，綠色植物或藻類可以直接利用日光行光合作用，被稱為「消費者」。", options: ["錯", "對"], answer: 0, hint: "自己製造養分的叫做「生產者」。" },
+            { id: 31, type: "choice", category: "生態系", text: "以植物為食的草食性動物（如昆蟲、斑馬），在營養階層中屬於什麼？", options: ["生產者", "二級消費者", "一級消費者", "分解者"], answer: 2, hint: "牠們是第一個吃植物的動物。" },
+            { id: 32, type: "tf", category: "生態系", text: "肉食性動物以其他動物為食，在食物鏈中屬於「二級消費者」或更高級的消費者。", options: ["對", "錯"], answer: 0, hint: "例如吃小魚的小白鷺就是二級消費者。" },
+            { id: 33, type: "choice", category: "生態系", text: "下列哪一個食物鏈的順序是正確的？", options: ["藻類 → 虱目魚 → 小白鷺", "小白鷺 → 虱目魚 → 藻類", "虱目魚 → 藻類 → 小白鷺", "藻類 → 小白鷺 → 虱目魚"], answer: 0, hint: "能量是從生產者開始，依序被吃掉傳遞上去的。" },
+            { id: 34, type: "tf", category: "動物行為", text: "像螞蟻這樣群體生活在一起，並且有分工合作的社會性行為，稱為「社會性的動物」。", options: ["對", "錯"], answer: 0, hint: "蜜蜂也是有名的社會性動物。" },
+            { id: 35, type: "choice", category: "動物行為", text: "在螞蟻的社會中，體型最大、專門「負責產卵」的是誰？", options: ["雄蟻", "兵蟻", "工蟻", "蟻后"], answer: 3, hint: "她是整個蟻群的媽媽。" },
+            { id: 36, type: "tf", category: "動物行為", text: "螞蟻窩裡數量最龐大的是「兵蟻」，牠們負責擔任清潔、覓食和育幼等工作。", options: ["錯", "對"], answer: 0, hint: "負責做家事和找食物的叫做「工蟻」，兵蟻負責防禦喔！" },
+            { id: 37, type: "choice", category: "動物行為", text: "蜜蜂通常會用什麼方式來向同伴傳達「蜜源在哪裡」的訊息？", options: ["發出氣味", "跳舞蹈", "發光", "大聲鳴叫"], answer: 1, hint: "牠們會在空中飛出像「8」字型的圖案。" },
+            { id: 38, type: "tf", category: "動物行為", text: "海豚在海中會利用不同的「聲音」來彼此交換訊息。", options: ["對", "錯"], answer: 0, hint: "海豚的叫聲非常多變，是牠們溝通的重要方式。" },
+            { id: 39, type: "choice", category: "動物行為", text: "螞蟻在外出覓食時，主要利用什麼來標記行進路線？", options: ["腳印", "聲音", "氣味", "視覺"], answer: 2, hint: "所以牠們常常排成一直線前進。" },
+            { id: 40, type: "tf", category: "動物行為", text: "如果我們阻斷了螞蟻原本行進的路線，螞蟻可能會因為找不到原本留下的氣味而無法依循路線移動。", options: ["對", "錯"], answer: 0, hint: "氣味路線一斷，螞蟻就會暫時迷路了。" },
+            { id: 41, type: "choice", category: "生態系", text: "同一棲地的族群間，一種生物捕捉並吃掉另一種生物，這屬於什麼關係？", options: ["競爭", "共生", "掠食", "寄生"], answer: 2, hint: "就像獅子抓羚羊來吃一樣。" },
+            { id: 42, type: "tf", category: "生態系", text: "兩隻生物為了爭奪食物、居所或交配權而打架，這種關係稱為「競爭」。", options: ["對", "錯"], answer: 0, hint: "資源有限時，生物之間就會發生競爭。" },
+            { id: 43, type: "choice", category: "生態系", text: "不同生物形成緊密關係，可能一方受益一方無害，或雙方都受益，這稱為什麼？", options: ["共生", "競爭", "寄生", "掠食"], answer: 0, hint: "大家和平相處，一起生活。" },
+            { id: 44, type: "tf", category: "生態系", text: "寄生物依附在寄主身上獲取利益，而且寄主會受到傷害，這稱為「寄生」。", options: ["對", "錯"], answer: 0, hint: "例如吸血的跳蚤或蝨子。" },
+            { id: 45, type: "choice", category: "生物體", text: "人體器官是由哪一個「最基本的單位」所組成的？", options: ["組織", "系統", "細胞", "骨骼"], answer: 2, hint: "它是構成生物體最小的活體積木。" },
+            { id: 46, type: "tf", category: "生物體", text: "人體的組成層次由小到大依序是：細胞 → 組織 → 器官 → 器官系統 → 個體。", options: ["對", "錯"], answer: 0, hint: "這是一個從小零件組合成大機器的概念。" },
+            { id: 47, type: "choice", category: "生物體", text: "許多功能相近的「細胞」聚集在一起，會形成什麼？", options: ["器官", "組織", "系統", "個體"], answer: 1, hint: "例如皮膜組織、肌肉組織。" },
+            { id: 48, type: "tf", category: "生物體", text: "口腔、食道、胃、大腸、小腸等不同的「器官」，共同組成了我們的「消化器官系統」。", options: ["對", "錯"], answer: 0, hint: "這些器官合作完成把食物消化吸收的任務。" },
+            { id: 49, type: "choice", category: "生物體", text: "動物為了生存，除了需要防禦天敵，攝取什麼來獲得能量和養分更是維持生命的關鍵？", options: ["石頭", "食物", "泥土", "空氣而已"], answer: 1, hint: "肚子餓了就要吃東西。" },
+            { id: 50, type: "tf", category: "生物體", text: "人類攝取的食物，必須經過消化系統的處理，才能將養分吸收並送往全身利用。", options: ["對", "錯"], answer: 0, hint: "胃和腸子負責把大塊食物變成小分子的養分。" },
+
+            // --- 4-2 動物的生存之道 (25題) ---
+            { id: 51, type: "choice", category: "動物適應", text: "人類或許多動物在運動時，主要是由哪三個構造互相配合完成的？", options: ["血液、神經、心臟", "骨骼、肌肉、關節", "皮膚、毛髮、指甲", "胃、腸、肝臟"], answer: 1, hint: "骨頭負責支撐，肌肉負責拉動，關節負責彎曲。" },
+            { id: 52, type: "tf", category: "動物適應", text: "當我們手臂彎曲時，是因為手臂「內側」的肌肉收縮，而外側的肌肉舒張。", options: ["對", "錯"], answer: 0, hint: "肌肉一縮短，就會拉動骨頭彎起來。" },
+            { id: 53, type: "choice", category: "動物適應", text: "沒有骨骼的動物（例如蝸牛和蚯蚓），是利用什麼方式使身體前進？", options: ["利用關節滑動", "利用翅膀飛行", "利用肌肉的伸縮", "在地上滾動"], answer: 2, hint: "牠們的身體軟軟的，靠著肌肉一長一短來爬行。" },
+            { id: 54, type: "tf", category: "動物適應", text: "動物為了求生存必須覓食，而牠們的「覓食方式」通常與其「身體構造」息息相關。", options: ["對", "錯"], answer: 0, hint: "長什麼樣的嘴巴，就吃什麼樣的食物。" },
+            { id: 55, type: "choice", category: "動物適應", text: "柑橘鳳蝶主要是利用什麼樣的構造來吸食花蜜？", options: ["長長的鼻子", "強壯的爪子", "像吸管的口器", "快速伸長的舌頭"], answer: 2, hint: "像我們喝飲料用的管子一樣。" },
+            { id: 56, type: "tf", category: "動物適應", text: "變色龍在捕食昆蟲時，會利用牠強壯的爪子抓住獵物。", options: ["錯", "對"], answer: 0, hint: "變色龍是利用『可快速伸長的舌頭』黏住獵物喔！強壯爪子是老鷹的特徵。" },
+            { id: 57, type: "choice", category: "動物適應", text: "老鷹（鷹）捕捉地上的獵物時，主要利用哪個身體構造？", options: ["強壯的爪子", "長長的鼻子", "像吸管的口器", "長舌頭"], answer: 0, hint: "猛禽的標準配備，非常銳利。" },
+            { id: 58, type: "tf", category: "動物適應", text: "大象覓食時，會利用長長的鼻子抓取食物放進口中。", options: ["對", "錯"], answer: 0, hint: "大象的鼻子就像我們的手一樣靈活。" },
+            { id: 59, type: "choice", category: "體溫調節", text: "根據動物調節體溫的方式，科學家將動物分為哪兩大類？", options: ["草食動物與肉食動物", "水生動物與陸生動物", "內溫動物與外溫動物", "卵生動物與胎生動物"], answer: 2, hint: "跟動物怎麼控制身體的「溫度」有關。" },
+            { id: 60, type: "tf", category: "體溫調節", text: "「內溫動物」是利用身體內部所產生的熱來維持體溫，體溫變化不大。", options: ["對", "錯"], answer: 0, hint: "我們人類也是內溫動物喔！" },
+            { id: 61, type: "choice", category: "體溫調節", text: "下列哪一組動物屬於「內溫動物」？", options: ["爬蟲類、昆蟲", "哺乳類、鳥類", "兩生類、魚類", "蝸牛、蚯蚓"], answer: 1, hint: "有羽毛或毛髮保暖的動物群。" },
+            { id: 62, type: "tf", category: "體溫調節", text: "「外溫動物」的體溫會隨著環境溫度而改變，牠們常需要從外界環境吸收熱或降溫。", options: ["對", "錯"], answer: 0, hint: "所以蜥蜴常常需要趴在石頭上曬太陽。" },
+            { id: 63, type: "choice", category: "體溫調節", text: "下列哪一種動物屬於「外溫動物」？", options: ["企鵝(鳥類)", "鯨魚(哺乳類)", "獅子(哺乳類)", "青蛙(兩生類)"], answer: 3, hint: "冬天很冷的時候，牠的體溫也會跟著變冷。" },
+            { id: 64, type: "tf", category: "體溫調節", text: "外溫動物（如爬蟲類、昆蟲）在天氣熱的時候，可能會躲在陰涼處來調整行為降溫。", options: ["對", "錯"], answer: 0, hint: "因為牠們無法靠自己流汗散熱，只能換個地方躲。" },
+            { id: 65, type: "choice", category: "動物適應", text: "當我們手臂伸直時，肌肉的狀態是如何變化的？", options: ["內側收縮、外側舒張", "內側舒張、外側收縮", "兩邊同時收縮", "兩邊同時舒張"], answer: 1, hint: "跟彎曲時剛好相反喔！手臂外側的三頭肌要用力拉直。" },
+            { id: 66, type: "tf", category: "動物行為", text: "有些動物會隨著季節的變化，遷移到適合的環境生長、覓食或繁殖，例如紫斑蝶冬天會到南部山谷度冬。", options: ["對", "錯"], answer: 0, hint: "黑面琵鷺也是為了躲避北方的寒冬飛來臺灣。" },
+            { id: 67, type: "choice", category: "體溫調節", text: "如果氣溫突然從30度降到10度，下列哪一種動物的體溫『不會』跟著劇烈下降？", options: ["蛇(爬蟲類)", "人類(哺乳類)", "金魚(魚類)", "蝴蝶(昆蟲)"], answer: 1, hint: "哺乳動物是內溫動物，會自動產熱保暖。" },
+            { id: 68, type: "tf", category: "體溫調節", text: "內溫動物也需要適度的散熱和保溫，才能將體溫維持在一定的範圍內。", options: ["對", "錯"], answer: 0, hint: "夏天流汗、冬天發抖，都是維持體溫的方法。" },
+            { id: 69, type: "choice", category: "動物適應", text: "蝸牛在地上爬行時，我們『看不到』哪種構造？", options: ["肌肉", "殼", "觸角", "關節與骨骼"], answer: 3, hint: "蝸牛是軟體動物，體內沒有硬硬的骨架。" },
+            { id: 70, type: "tf", category: "動物適應", text: "各種動物為了生存，演化出不同的構造和行為，這都是為了適應牠們所處的環境。", options: ["對", "錯"], answer: 0, hint: "這就是自然界奇妙的生存之道。" },
+            { id: 71, type: "choice", category: "生態系", text: "當森林發生大火，草食動物和肉食動物都會逃跑，這時牠們之間原本的什麼關係會被中斷？", options: ["共生", "食物鏈(吃與被吃)", "寄生", "合作"], answer: 1, hint: "大家都忙著逃命，沒空吃別人了。" },
+            { id: 72, type: "tf", category: "生物體", text: "心臟、肺臟、胃等都是由組織構成的「器官」，單一器官就能獨立完成消化吸收的所有工作。", options: ["錯", "對"], answer: 0, hint: "消化吸收需要口腔、食道、胃、腸等器官組成「系統」一起合作才能完成。" },
+            { id: 73, type: "choice", category: "體溫調節", text: "觀察「外溫動物」的體溫變化圖表，體溫線條通常會呈現什麼形狀？", options: ["一直保持水平", "像波浪一樣隨環境起伏", "一直線往上飆升", "一直線往下掉"], answer: 1, hint: "環境熱牠就熱，環境冷牠就冷。" },
+            { id: 74, type: "tf", category: "動物適應", text: "雖然動物有不同的覓食方式，但最終目的都是從食物中獲得維持生命所需的「能量」。", options: ["對", "錯"], answer: 0, hint: "食物就是生物的電池燃料。" },
+            { id: 75, type: "choice", category: "生態系", text: "在同一棲地中，小鳥吃毛毛蟲，這屬於生物間交互作用中的哪一種？", options: ["競爭", "共生", "掠食", "寄生"], answer: 2, hint: "一方把另一方吃掉的行為。" },
+
+            // --- 4-3 動物的生命延續 (25題) ---
+            { id: 76, type: "choice", category: "生殖方式", text: "動物會利用聲音、氣味、發光、舞蹈等方式吸引異性，達到交配繁殖的目的，這稱為什麼行為？", options: ["禦敵行為", "求偶行為", "覓食行為", "育幼行為"], answer: 1, hint: "尋找另一半的舉動。" },
+            { id: 77, type: "tf", category: "生殖方式", text: "雌蠶蛾會散發出特殊的「氣味」，而雄蠶蛾會利用觸角來尋找雌蛾。", options: ["對", "錯"], answer: 0, hint: "昆蟲常利用這種化學物質(費洛蒙)來溝通求偶。" },
+            { id: 78, type: "choice", category: "生殖方式", text: "哪一種動物的雄性，會張開絢麗的尾羽並不斷抖動，千方百計引誘雌鳥？", options: ["老鷹", "孔雀", "麻雀", "烏鴉"], answer: 1, hint: "這叫做「開屏」。" },
+            { id: 79, type: "tf", category: "生殖方式", text: "在求偶季時，雄黃緣螢會一邊飛舞一邊發光，而雌蟲會停在草叢中發出螢光回應，來吸引雄蟲。", options: ["對", "錯"], answer: 0, hint: "夏夜的閃爍燈光就是牠們的愛情暗號。" },
+            { id: 80, type: "choice", category: "生殖方式", text: "繁殖季時，雄彈塗魚會豎起背鰭，並在泥地上做出什麼動作來吸引母魚？", options: ["大聲唱歌", "轉圈跳舞", "挖洞躲起來", "發出螢光"], answer: 1, hint: "牠們會在濕地上活蹦亂跳。" },
+            { id: 81, type: "tf", category: "生殖方式", text: "動物的繁殖方式主要有「卵生」和「胎生」，這兩種的胚胎養分來源和產出型態都一樣。", options: ["錯", "對"], answer: 0, hint: "一個生蛋(養分來自卵)，一個生出小寶寶(養分來自媽媽)，完全不一樣喔！" },
+            { id: 82, type: "choice", category: "生殖方式", text: "動物將卵排出體外，再孵化出小動物的生殖方式叫做？", options: ["胎生", "分裂生殖", "卵生", "出芽生殖"], answer: 2, hint: "有殼或軟軟的蛋在外面孵化。" },
+            { id: 83, type: "tf", category: "生殖方式", text: "卵生動物（如鳥類、蛙類、烏龜）在孵化期間，胚胎發育所需的養分完全由「母體」血液提供。", options: ["錯", "對"], answer: 0, hint: "既然蛋已經生出來了，養分當然是靠蛋裡面的「卵黃」提供囉。" },
+            { id: 84, type: "choice", category: "生殖方式", text: "胎兒在母體內發育完全後才生出來，且胚胎養分來自母體，這稱為什麼？", options: ["卵生", "胎生", "卵胎生", "寄生"], answer: 1, hint: "大多數哺乳類(含人類)都是這種方式。" },
+            { id: 85, type: "tf", category: "生殖方式", text: "貓、狗、羊、人和海豚，這些動物的生殖方式都屬於「胎生」。", options: ["對", "錯"], answer: 0, hint: "牠們的寶寶都是在媽媽肚子裡吸收營養長大才生出來的。" },
+            { id: 86, type: "choice", category: "動物行為", text: "親鳥為了保護幼鳥免受天敵攻擊，可能會假裝自己受傷來引開敵人，這稱為什麼行為？", options: ["求偶行為", "擬傷行為(育幼)", "覓食行為", "競爭行為"], answer: 1, hint: "這是一種偉大的母愛表現，用苦肉計騙走敵人。" },
+            { id: 87, type: "tf", category: "動物行為", text: "動物的護幼和育幼行為，主要的目的是為了「提高子代(幼兒)的生存機率」。", options: ["對", "錯"], answer: 0, hint: "保護寶寶平安長大。" },
+            { id: 88, type: "choice", category: "動物行為", text: "哺乳類動物（如貓咪、袋鼠、無尾熊）的母親，通常會分泌什麼來餵哺幼獸？", options: ["唾液", "花蜜", "乳汁", "清水"], answer: 2, hint: "這就是為什麼牠們被稱為『哺乳』類。" },
+            { id: 89, type: "tf", category: "動物行為", text: "除了鳥類和哺乳類，昆蟲類（如椿象）和兩生類（如部分蛙類）也可能會有護卵的行為。", options: ["對", "錯"], answer: 0, hint: "護卵也是育幼行為的一種展現。" },
+            { id: 90, type: "choice", category: "生殖方式", text: "親代有些外形特徵會「遺傳」給子代，下列哪一項通常是人類『可以觀察』的遺傳性狀？", options: ["頭髮長度", "有沒有美人尖", "衣服顏色", "講話聲音的大小"], answer: 1, hint: "這是天生長相的一部分，額頭前面的髮際線形狀。" },
+            { id: 91, type: "tf", category: "生殖方式", text: "動物可從體型大小、毛色、臉部樣貌等外形特徵，來判斷子代與親代之間的異同。", options: ["對", "錯"], answer: 0, hint: "就像你會長得有點像爸爸或媽媽一樣。" },
+            { id: 92, type: "choice", category: "生殖方式", text: "下列關於人類遺傳特徵的配對，哪一個『不是』相對的遺傳性狀？", options: ["單眼皮 / 雙眼皮", "耳垂分離 / 耳垂緊貼", "拇指直立 / 拇指彎曲", "喜歡吃菜 / 喜歡吃肉"], answer: 3, hint: "飲食喜好是後天習慣，不是天生遺傳的形狀喔！" },
+            { id: 93, type: "tf", category: "生殖方式", text: "生物藉著生殖行為代代繁衍，許多外形特徵也會跟著代代相傳。", options: ["對", "錯"], answer: 0, hint: "這就是「遺傳」的奧秘。" },
+            { id: 94, type: "choice", category: "動物行為", text: "鳥類在雛鳥孵出後，除了親鳥覓食餵養外，通常還會教導雛鳥什麼生存技能？", options: ["挖地洞", "飛行或游水", "寫字", "變色"], answer: 1, hint: "讓小鳥以後能自己獨立生活。" },
+            { id: 95, type: "tf", category: "生殖方式", text: "「美人尖」是指額頭前髮際線中央有一個向下凸出的尖角，這是一種可遺傳的外形特徵。", options: ["對", "錯"], answer: 0, hint: "可以回家觀察看看家人有沒有喔。" },
+            { id: 96, type: "choice", category: "生殖方式", text: "下列哪一種動物的胚胎，是在『母體外』的蛋殼裡發育的？", options: ["人類", "海豚", "綠蠵龜", "狗"], answer: 2, hint: "爬蟲類通常會挖洞下蛋。" },
+            { id: 97, type: "tf", category: "動物行為", text: "人類嬰兒出生到長大，接受父母許多的照顧，這也算是自然界中的「育幼行為」。", options: ["對", "錯"], answer: 0, hint: "人類的育幼期在所有動物中算是非常長的。" },
+            { id: 98, type: "choice", category: "生殖方式", text: "有些人的大拇指用力豎起時能向後彎曲，有些人的只能直直的，這代表什麼意思？", options: ["因為骨折過", "是不同的遺傳特徵性狀", "因為有運動", "是傳染病"], answer: 1, hint: "這是天生基因決定的關節柔軟度。" },
+            { id: 99, type: "tf", category: "生殖方式", text: "子代（小孩）的外表特徵，一定會長得跟親代（父母）其中一方百分之百完全一模一樣。", options: ["錯", "對"], answer: 0, hint: "子代會綜合父母親的特徵，有相似處也有相異處，不會100%複製貼上。" },
+            { id: 100, type: "choice", category: "生殖方式", text: "動物求偶、交配、護幼的最終目的，用一句話總結是什麼？", options: ["為了好玩", "為了稱霸世界", "生命的延續(繁衍下一代)", "為了尋找食物"], answer: 2, hint: "讓自己的物種能夠在地球上繼續生存下去。" }
+        ];
+
+        let gameState = {
+            punchedCells: 0,
+            correctAnswers: 0,
+            hintsUsed: 0,
+            score: 0,
+            currentQuestionIndex: -1,
+            selectedOptionIndex: -1,
+            isHintRevealed: false,
+            answeredQuestions: new Set(),
+            wrongCategories: {} // 記錄錯題的分類
+        };
+
+        // Review Summaries Database (依照課本圖片重點重新整理)
+        const reviewSummaries = {
+            "生鏽": `
+                <div class="mb-2"><span class="text-lg font-bold text-blue-700">🧲 3-1 生鏽知多少</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-red-600">特徵</span>：鐵製品生鏽會產生褐色/紅棕色的「鐵鏽」，摸起來粗糙、會掉屑。</li>
+                    <li><span class="font-bold text-blue-600">實驗變因</span>：依據假設而改變的叫<span class="bg-blue-100 text-blue-800 px-1 rounded">操作變因</span>；保持不變的叫<span class="bg-blue-100 text-blue-800 px-1 rounded">控制變因</span>。</li>
+                    <li><span class="font-bold text-purple-600">生鏽原因</span>：接觸較多的 <strong class="text-red-500">空氣</strong> 和 <strong class="text-blue-500">水分</strong>。</li>
+                    <li><span class="font-bold text-green-600">防鏽方法</span>：隔絕或減少水分與空氣。例如：塗油漆（鐵門）、抹油（腳踏車鏈條）、保持乾燥（廚具）、塑膠皮包覆（迴紋針）、電鍍或合金（不鏽鋼餐具）。</li>
+                </ul>
+            `,
+            "食物保存": `
+                <div class="mb-2"><span class="text-lg font-bold text-orange-700">🍞 3-2 生活中的食物保存</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-red-600">發霉元凶</span>：微生物（如黴菌），可用放大鏡或顯微鏡觀察。</li>
+                    <li><span class="font-bold text-blue-600">生長環境</span>：容易在 <span class="bg-orange-100 text-orange-800 px-1 rounded">溫暖、陰暗、潮溼</span> 的環境生長。</li>
+                    <li><span class="font-bold text-green-600">保存原理</span>：<strong class="text-blue-600">隔絕空氣、減少水分、保持低溫</strong>。</li>
+                    <li><span class="font-bold text-purple-600">保存方法</span>：
+                        <ul class="list-circle pl-5 mt-1 text-sm text-gray-600">
+                            <li><strong>傳統</strong>：曝曬、醃漬、煙燻等。</li>
+                            <li><strong>現代</strong>：放入乾燥包、製成罐頭、真空包裝、填充氮氣、低溫冷藏或冷凍等。</li>
+                        </ul>
+                    </li>
+                </ul>
+            `,
+            "生態系": `
+                <div class="mb-2"><span class="text-lg font-bold text-green-700">🌿 4-1 & 4-2 生態群體與互動</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-blue-600">群體名詞</span>：同種生物集合稱為 <strong class="text-blue-700">族群</strong>；不同物種集合稱為 <strong class="text-blue-700">群集</strong>。</li>
+                    <li><span class="font-bold text-green-600">食物鏈</span>：能量流動的連結。
+                        <ul class="list-circle pl-5 mt-1 text-sm text-gray-600">
+                            <li><strong class="text-green-700">生產者</strong>：綠色植物/藻類（行光合作用製造養分）。</li>
+                            <li><strong class="text-yellow-700">一級消費者</strong>：草食性動物。</li>
+                            <li><strong class="text-red-700">二級消費者</strong>：肉食性動物。</li>
+                        </ul>
+                    </li>
+                    <li><span class="font-bold text-purple-600">交互作用</span>：生物間有 <span class="bg-purple-100 px-1 rounded">掠食、競爭、共生、寄生</span> 等關係。</li>
+                </ul>
+            `,
+            "動物行為": `
+                <div class="mb-2"><span class="text-lg font-bold text-indigo-700">🐜 社會性與溝通行為</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-blue-600">社會性動物</span>：群體生活且分工合作（如螞蟻、蜜蜂）。螞蟻分為負責產卵的<strong class="text-red-500">蟻后</strong>、交配的<strong class="text-blue-500">雄蟻</strong>、防禦的<strong class="text-gray-600">兵蟻</strong>與負責清潔覓食的<strong class="text-yellow-600">工蟻</strong>。</li>
+                    <li><span class="font-bold text-green-600">訊息傳遞</span>：螞蟻利用 <strong class="text-orange-600">氣味</strong>、蜜蜂利用 <strong class="text-orange-600">舞蹈</strong>、海豚利用 <strong class="text-orange-600">聲音</strong> 交換訊息。</li>
+                </ul>
+            `,
+            "生物體": `
+                <div class="mb-2"><span class="text-lg font-bold text-purple-700">🧬 生物體的組成</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-blue-600">人體層級</span>：由小到大為 <span class="bg-purple-100 px-1 rounded font-bold">細胞 &rarr; 組織 &rarr; 器官 &rarr; 器官系統 &rarr; 個體</span>。</li>
+                    <li><span class="font-bold text-green-600">最小單位</span>：<strong class="text-purple-700">細胞</strong> 是構成人體最基本的單位。</li>
+                    <li><span class="font-bold text-orange-600">消化系統</span>：食物須經由口腔、食道、胃、小腸、大腸等器官組成的系統處理並吸收養分。</li>
+                </ul>
+            `,
+            "動物適應": `
+                <div class="mb-2"><span class="text-lg font-bold text-yellow-700">🐆 動物的生存之道</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-blue-600">運動構造</span>：大多由 <span class="bg-yellow-100 px-1 rounded">骨骼、肌肉、關節</span> 互相配合。沒有骨骼的動物（如蝸牛、蚯蚓）則利用<strong class="text-red-500">肌肉伸縮</strong>前進。</li>
+                    <li><span class="font-bold text-green-600">覓食方式</span>：與身體構造有關。
+                        <ul class="list-circle pl-5 mt-1 text-sm text-gray-600">
+                            <li><strong>蝴蝶</strong>：管狀口器吸花蜜。</li>
+                            <li><strong>變色龍</strong>：長舌黏住獵物。</li>
+                            <li><strong>鷹</strong>：強壯爪子抓住獵物。</li>
+                            <li><strong>大象</strong>：長鼻抓取食物。</li>
+                        </ul>
+                    </li>
+                </ul>
+            `,
+            "生殖方式": `
+                <div class="mb-2"><span class="text-lg font-bold text-pink-700">🐣 動物的生命延續</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-pink-600">求偶方式</span>：發出聲音、氣味（蠶蛾）、發光（螢火蟲）、舞蹈（彈塗魚）或外形變化（孔雀）。</li>
+                    <li><span class="font-bold text-blue-600">繁殖方式</span>：
+                        <ul class="list-circle pl-5 mt-1 text-sm text-gray-600">
+                            <li><strong class="text-blue-700">卵生</strong>：受精卵在<strong class="text-red-500">母體外</strong>發育，養分來自<strong class="text-red-500">卵</strong>（如雞、鴨、鳥、龜、蛙）。</li>
+                            <li><strong class="text-green-700">胎生</strong>：胎兒在<strong class="text-red-500">母體內</strong>發育完全才出生，養分來自<strong class="text-red-500">母體</strong>（如人、貓、狗、羊、海豚）。</li>
+                        </ul>
+                    </li>
+                    <li><span class="font-bold text-purple-600">遺傳特徵</span>：子代會遺傳親代特徵，可觀察：單/雙眼皮、有無美人尖、耳垂緊貼/分離、拇指彎曲等。</li>
+                </ul>
+            `,
+            "體溫調節": `
+                <div class="mb-2"><span class="text-lg font-bold text-red-700">🌡️ 體溫的調節</span></div>
+                <ul class="list-disc pl-5 space-y-2 text-gray-700">
+                    <li><span class="font-bold text-red-600">內溫動物</span>：利用<strong class="text-red-700">身體內部產生的熱能</strong>維持體溫，體溫變化不大（如 <span class="bg-red-100 px-1 rounded">哺乳類、鳥類</span>）。</li>
+                    <li><span class="font-bold text-blue-600">外溫動物</span>：從外界環境吸收熱或降溫（如曬太陽、躲陰涼處），<strong class="text-blue-700">體溫隨環境改變</strong>（如 <span class="bg-blue-100 px-1 rounded">爬蟲類、兩生類、昆蟲、魚類</span>）。</li>
+                </ul>
+            `
+        };
+
+        // DOM Elements
+        const gridContainer = document.getElementById('game-grid');
+        const progressCount = document.getElementById('progress-count');
+        const scoreDisplay = document.getElementById('score-display');
+        const modal = document.getElementById('question-modal');
+        const qNumber = document.getElementById('q-number');
+        const qCategory = document.getElementById('q-category');
+        const qText = document.getElementById('q-text');
+        const qOptionsContainer = document.getElementById('q-options');
+        const btnSubmit = document.getElementById('btn-submit');
+        const btnHint = document.getElementById('btn-hint');
+        const hintContainer = document.getElementById('hint-container');
+        const hintText = document.getElementById('hint-text');
+        
+        const feedbackOverlay = document.getElementById('feedback-overlay');
+        const feedbackIcon = document.getElementById('feedback-icon');
+        const feedbackTitle = document.getElementById('feedback-title');
+        const feedbackDesc = document.getElementById('feedback-desc');
+        const btnCloseModal = document.getElementById('btn-close-modal');
+        
+        const reportModal = document.getElementById('report-modal');
+
+        // Shuffle all 100 questions and pick exactly 40 for the grid
+        const shuffledQuestions = [...questionsData].sort(() => Math.random() - 0.5).slice(0, 40);
+
+        function initGrid() {
+            for (let i = 0; i < 40; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'punch-cell';
+                cell.textContent = i + 1;
+                cell.dataset.index = i;
+                
+                cell.addEventListener('click', () => openQuestion(i, cell));
+                gridContainer.appendChild(cell);
+            }
+        }
+
+        function openQuestion(index, cellElement) {
+            if (gameState.answeredQuestions.has(index)) return; // Already answered
+
+            const qData = shuffledQuestions[index];
+            gameState.currentQuestionIndex = index;
+            gameState.selectedOptionIndex = -1;
+            gameState.isHintRevealed = false;
+            gameState.currentCell = cellElement;
+
+            // Reset UI
+            hintContainer.style.display = 'none';
+            btnHint.style.display = 'flex';
+            feedbackOverlay.classList.add('hidden');
+            btnSubmit.disabled = true;
+
+            // Populate Data
+            qNumber.textContent = index + 1;
+            qCategory.textContent = qData.category;
+            qText.textContent = qData.text;
+            hintText.textContent = qData.hint;
+
+            // Populate Options
+            qOptionsContainer.innerHTML = '';
+            qData.options.forEach((optText, optIndex) => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.textContent = optText;
+                btn.addEventListener('click', () => selectOption(optIndex, btn));
+                qOptionsContainer.appendChild(btn);
+            });
+
+            modal.style.display = 'block';
+        }
+
+        function selectOption(index, btnElement) {
+            gameState.selectedOptionIndex = index;
+            
+            // UI Update
+            const allOptions = qOptionsContainer.querySelectorAll('.option-btn');
+            allOptions.forEach(btn => btn.classList.remove('selected'));
+            btnElement.classList.add('selected');
+            
+            btnSubmit.disabled = false;
+        }
+
+        btnHint.addEventListener('click', () => {
+            if (!gameState.isHintRevealed) {
+                gameState.isHintRevealed = true;
+                gameState.hintsUsed++;
+                hintContainer.style.display = 'block';
+                btnHint.style.display = 'none';
+            }
+        });
+
+        btnSubmit.addEventListener('click', () => {
+            const qData = shuffledQuestions[gameState.currentQuestionIndex];
+            const isCorrect = gameState.selectedOptionIndex === qData.answer;
+            
+            gameState.answeredQuestions.add(gameState.currentQuestionIndex);
+            gameState.punchedCells++;
+            
+            // Calculate Score (Base 10, -5 if hint used)
+            let earnedScore = 0;
+
+            if (isCorrect) {
+                gameState.correctAnswers++;
+                earnedScore = gameState.isHintRevealed ? 5 : 10;
+                gameState.score += earnedScore;
+                
+                feedbackIcon.textContent = "🌟";
+                feedbackTitle.textContent = "答對了！太棒了！";
+                feedbackTitle.className = "text-2xl font-bold mb-2 text-green-600";
+                feedbackDesc.textContent = `獲得 ${earnedScore} 分！繼續保持！`;
+                
+                gameState.currentCell.classList.add('punched');
+            } else {
+                // 記錄答錯的分類
+                gameState.wrongCategories[qData.category] = (gameState.wrongCategories[qData.category] || 0) + 1;
+
+                feedbackIcon.textContent = "💦";
+                feedbackTitle.textContent = "哎呀，答錯了！";
+                feedbackTitle.className = "text-2xl font-bold mb-2 text-red-600";
+                feedbackDesc.textContent = `正確答案是：「${qData.options[qData.answer]}」。別灰心，記起來下次就會了！`;
+                
+                gameState.currentCell.classList.add('punched', 'wrong');
+            }
+
+            // Update Header Stats
+            progressCount.textContent = gameState.punchedCells;
+            scoreDisplay.textContent = gameState.score;
+            gameState.currentCell.textContent = ""; // remove number
+
+            // Show feedback overlay
+            feedbackOverlay.classList.remove('hidden');
+        });
+
+        btnCloseModal.addEventListener('click', () => {
+            modal.style.display = 'none';
+            
+            if (gameState.punchedCells === 40) {
+                showFinalReport();
+            }
+        });
+
+        function showFinalReport() {
+            document.getElementById('report-correct').textContent = gameState.correctAnswers;
+            document.getElementById('report-hints').textContent = gameState.hintsUsed;
+            document.getElementById('report-score').textContent = gameState.score;
+            
+            // 處理迷思概念與重點整理
+            const weaknessSection = document.getElementById('weakness-section');
+            const weaknessList = document.getElementById('weakness-list');
+            const reviewContent = document.getElementById('review-content');
+            
+            weaknessList.innerHTML = '';
+            reviewContent.innerHTML = '';
+            
+            // 移除原本預設的內距與底色，改由內部子元素控制
+            reviewContent.className = "space-y-4 mt-4"; 
+
+            // 找出錯最多次的分類
+            const wrongTopics = Object.keys(gameState.wrongCategories).sort((a, b) => gameState.wrongCategories[b] - gameState.wrongCategories[a]);
+
+            if (wrongTopics.length > 0) {
+                // 顯示迷思概念區塊
+                weaknessSection.classList.remove('hidden');
+                wrongTopics.forEach(topic => {
+                    const li = document.createElement('li');
+                    li.textContent = `${topic} (答錯 ${gameState.wrongCategories[topic]} 題)`;
+                    weaknessList.appendChild(li);
+                    
+                    // 將對應的重點整理加入複習區
+                    let reviewText = "";
+                    for (const key in reviewSummaries) {
+                        if (topic.includes(key) || key.includes(topic)) {
+                            reviewText = reviewSummaries[key];
+                            break;
+                        }
+                    }
+                    if(reviewText) {
+                        const card = document.createElement('div');
+                        // 給予每個重點區塊漂亮的卡片外觀
+                        card.className = "bg-white border-l-4 border-green-500 rounded-r-lg shadow-sm p-5";
+                        card.innerHTML = reviewText;
+                        reviewContent.appendChild(card);
+                    }
+                });
+                
+                // 如果錯的類型比較少，補足一些核心重點給他看
+                if (wrongTopics.length < 3) {
+                    const extraP1 = document.createElement('div');
+                    extraP1.className = "bg-gray-50 border-l-4 border-blue-400 rounded-r-lg shadow-sm p-5 opacity-90";
+                    extraP1.innerHTML = reviewSummaries["生鏽"];
+                    
+                    const extraP2 = document.createElement('div');
+                    extraP2.className = "bg-gray-50 border-l-4 border-blue-400 rounded-r-lg shadow-sm p-5 opacity-90";
+                    extraP2.innerHTML = reviewSummaries["生態系"];
+                    
+                    const div = document.createElement('div');
+                    div.className = "mt-6 pt-4 border-t-2 border-dashed border-gray-300";
+                    div.innerHTML = "<h4 class='text-lg font-bold text-blue-600 mb-4 flex items-center gap-2'><svg xmlns='http://www.w3.org/2000/svg' class='h-5 w-5' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clip-rule='evenodd' /></svg> 其他核心觀念複習：</h4>";
+                    
+                    const extraContainer = document.createElement('div');
+                    extraContainer.className = "space-y-4";
+                    // 避免重複加入
+                    if(!wrongTopics.some(t => t.includes("生鏽"))) { extraContainer.appendChild(extraP1); }
+                    if(!wrongTopics.some(t => t.includes("生態"))) { extraContainer.appendChild(extraP2); }
+                    
+                    if(extraContainer.childNodes.length > 0) { 
+                        div.appendChild(extraContainer);
+                        reviewContent.appendChild(div); 
+                    }
+                }
+
+            } else {
+                // 全部答對的情況
+                weaknessSection.classList.add('hidden');
+                reviewContent.innerHTML = `
+                    <div class="text-center py-4">
+                        <span class="text-4xl mb-2 block">🏆</span>
+                        <p class="text-lg font-bold text-green-700">太完美了！你完全沒有迷思概念！</p>
+                        <p class="text-sm mt-2">你已經充分掌握了五年級自然科學「生鏽與食物保存」及「生態系」的所有重點，簡直是科學小天才！</p>
+                    </div>
+                `;
+            }
+
+            let msg = "";
+            if (gameState.score >= 350) {
+                msg = "太強了！你是名副其實的「自然科學大師」！💯";
+            } else if (gameState.score >= 250) {
+                msg = "很不錯喔！你已經具備「自然探險家」的實力了！🌟";
+            } else {
+                msg = "繼續加油！多複習重點，下次一定可以挑戰更高分！💪";
+            }
+            document.getElementById('report-message').textContent = msg;
+            
+            reportModal.style.display = 'block';
+        }
+
+        // Start Game
+        window.onload = initGrid;
+
+    </script>
+</body>
+</html>
