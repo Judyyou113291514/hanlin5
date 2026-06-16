@@ -143,8 +143,7 @@
             <p class="text-gray-700 text-lg">點擊下面的格子，回答問題來收集探險積分吧！</p>
         </div>
         <div id="game-grid" class="punch-grid">
-            <!-- JavaScript will populate 40 cells here -->
-        </div>
+            </div>
     </main>
 
     <div id="question-modal" class="modal">
@@ -157,8 +156,7 @@
             <p id="q-text" class="text-lg text-gray-700 mb-6 font-medium tracking-wide"></p>
             
             <div id="q-options" class="mb-6">
-                <!-- Options injected by JS -->
-            </div>
+                </div>
 
             <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <button id="btn-hint" class="flex items-center gap-2 text-yellow-600 hover:text-yellow-700 font-semibold transition-colors">
@@ -177,7 +175,6 @@
                 <span id="hint-text"></span>
             </div>
 
-            <!-- Feedback overlay inside modal -->
             <div id="feedback-overlay" class="hidden absolute inset-0 bg-white bg-opacity-90 flex flex-col items-center justify-center rounded-xl z-10">
                 <div id="feedback-icon" class="text-6xl mb-4"></div>
                 <h3 id="feedback-title" class="text-2xl font-bold mb-2"></h3>
@@ -210,7 +207,6 @@
                 </div>
             </div>
 
-            <!-- 迷思概念診斷區塊 -->
             <div id="weakness-section" class="mb-6 text-left hidden">
                 <h3 class="text-xl font-bold text-red-500 mb-2 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -222,15 +218,13 @@
                 </div>
             </div>
 
-            <!-- 重點整理複習區塊 -->
             <div id="review-section" class="mb-8 text-left">
                 <h3 class="text-xl font-bold text-green-600 mb-2 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                     專屬重點整理小秘笈
                 </h3>
                 <div id="review-content" class="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-800 space-y-3 shadow-inner">
-                    <!-- 動態載入重點內容 -->
-                </div>
+                    </div>
             </div>
             
             <p class="text-gray-600 mb-8 font-bold" id="report-message"></p>
@@ -624,75 +618,44 @@
             const wrongTopics = Object.keys(gameState.wrongCategories).sort((a, b) => gameState.wrongCategories[b] - gameState.wrongCategories[a]);
 
             if (wrongTopics.length > 0) {
-                // 顯示迷思概念區塊
+                // 有答錯時：顯示迷思概念清單
                 weaknessSection.classList.remove('hidden');
                 wrongTopics.forEach(topic => {
                     const li = document.createElement('li');
                     li.textContent = `${topic} (答錯 ${gameState.wrongCategories[topic]} 題)`;
                     weaknessList.appendChild(li);
-                    
-                    // 將對應的重點整理加入複習區
-                    let reviewText = "";
-                    for (const key in reviewSummaries) {
-                        if (topic.includes(key) || key.includes(topic)) {
-                            reviewText = reviewSummaries[key];
-                            break;
-                        }
-                    }
-                    if(reviewText) {
-                        const card = document.createElement('div');
-                        // 給予每個重點區塊漂亮的卡片外觀
-                        card.className = "bg-white border-l-4 border-green-500 rounded-r-lg shadow-sm p-5";
-                        card.innerHTML = reviewText;
-                        reviewContent.appendChild(card);
-                    }
                 });
-                
-                // 如果錯的類型比較少，補足一些核心重點給他看
-                if (wrongTopics.length < 3) {
-                    const extraP1 = document.createElement('div');
-                    extraP1.className = "bg-gray-50 border-l-4 border-blue-400 rounded-r-lg shadow-sm p-5 opacity-90";
-                    extraP1.innerHTML = reviewSummaries["生鏽"];
-                    
-                    const extraP2 = document.createElement('div');
-                    extraP2.className = "bg-gray-50 border-l-4 border-blue-400 rounded-r-lg shadow-sm p-5 opacity-90";
-                    extraP2.innerHTML = reviewSummaries["生態系"];
-                    
-                    const div = document.createElement('div');
-                    div.className = "mt-6 pt-4 border-t-2 border-dashed border-gray-300";
-                    div.innerHTML = "<h4 class='text-lg font-bold text-blue-600 mb-4 flex items-center gap-2'><svg xmlns='http://www.w3.org/2000/svg' class='h-5 w-5' viewBox='0 0 20 20' fill='currentColor'><path fill-rule='evenodd' d='M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z' clip-rule='evenodd' /></svg> 其他核心觀念複習：</h4>";
-                    
-                    const extraContainer = document.createElement('div');
-                    extraContainer.className = "space-y-4";
-                    // 避免重複加入
-                    if(!wrongTopics.some(t => t.includes("生鏽"))) { extraContainer.appendChild(extraP1); }
-                    if(!wrongTopics.some(t => t.includes("生態"))) { extraContainer.appendChild(extraP2); }
-                    
-                    if(extraContainer.childNodes.length > 0) { 
-                        div.appendChild(extraContainer);
-                        reviewContent.appendChild(div); 
-                    }
-                }
-
             } else {
-                // 全部答對的情況
+                // 全部答對的情況：隱藏迷思概念，但在重點區塊最上方加入滿分祝賀
                 weaknessSection.classList.add('hidden');
-                reviewContent.innerHTML = `
-                    <div class="text-center py-4">
-                        <span class="text-4xl mb-2 block">🏆</span>
-                        <p class="text-lg font-bold text-green-700">太完美了！你完全沒有迷思概念！</p>
-                        <p class="text-sm mt-2">你已經充分掌握了五年級自然科學「生鏽與食物保存」及「生態系」的所有重點，簡直是科學小天才！</p>
-                    </div>
+                const perfectMsg = document.createElement('div');
+                perfectMsg.className = "text-center py-6 mb-4 bg-green-100 rounded-lg shadow-inner";
+                perfectMsg.innerHTML = `
+                    <span class="text-5xl mb-3 block">🏆</span>
+                    <p class="text-xl font-bold text-green-700">太完美了！你完全沒有迷思概念！</p>
+                    <p class="text-sm mt-2 text-green-800">你已經充分掌握了所有的重點，簡直是科學小天才！</p>
+                    <p class="text-sm mt-1 text-gray-600">下方是完整的複習大補帖，可以再看一次加深印象喔！</p>
                 `;
+                reviewContent.appendChild(perfectMsg);
             }
 
+            // ★ 關鍵修改：不論答對或答錯，都將所有的重點整理完整印出
+            for (const key in reviewSummaries) {
+                const card = document.createElement('div');
+                // 給予每個重點區塊漂亮的卡片外觀
+                card.className = "bg-white border-l-4 border-green-500 rounded-r-lg shadow-sm p-5";
+                card.innerHTML = reviewSummaries[key];
+                reviewContent.appendChild(card);
+            }
+
+            // 結語訊息
             let msg = "";
             if (gameState.score >= 350) {
                 msg = "太強了！你是名副其實的「自然科學大師」！💯";
             } else if (gameState.score >= 250) {
                 msg = "很不錯喔！你已經具備「自然探險家」的實力了！🌟";
             } else {
-                msg = "繼續加油！多複習重點，下次一定可以挑戰更高分！💪";
+                msg = "繼續加油！多看幾次下方的重點，下次一定可以挑戰更高分！💪";
             }
             document.getElementById('report-message').textContent = msg;
             
